@@ -1,6 +1,7 @@
 import requests
 import logging
-import pathlib
+from pathlib import Path
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,23 @@ class NassDownload:
     def __init__(self):
         self.nass_dataset_url = "https://www.nass.usda.gov/datasets/"
         self.resp_content = None
-        self.dataset_links = []
+        self.dataset_links = None
+
+    def display_nass_dataset_links(self):
+        """
+        Prints available USDA NASS datasets
+        """
+        if self.resp_content is None:
+            self.get_nass_datasets_page()
+        if self.dataset_links is None:
+            self.get_list_of_available_dataset_urls()
+        for i in self.dataset_links:
+            print(i)
+
+    # def download_dataset(self, url: str):
+    #     """
+    #     Downloads a USDA NASS dataset from the provided URL, unzips it, places it in 
+    #     """
 
     def get_nass_datasets_page(self, num_retries:int = 3):
         """
@@ -44,19 +61,30 @@ class NassDownload:
     
         raise NassDatasetPageRetrievalError("Unable to retrieve USDA NASS dataset links.")
     
-    def get_list_of_available_datasets(self):
+    def get_list_of_available_dataset_urls(self):
         """
         Given a response from USDA NASS' dataset page response (class variable self.resp, HTML text output), create a list of the available datasets for download with BeautifulSoup.
         """
         if self.resp_content is None:
             raise ValueError("No value set for NassDownload.resp; call 'self.get_nass_datasets_page()' or set the resp (requests.Response) value manually.")
-        soup = BeautifulSoup(self.resp_content, 'html.parser')
-        print(soup)
 
-    # def generate_dataset_download_link(self, file_name:str):
-    #     """
-    #     Given a file name from the USDA NASS dataset list page, generate a link that can be used to download the file.
-    #     """
+        def generate_full_download_links(shortened_file_path: str):
+            """
+            Files in href are in format "/downloads/<file_name>"; remove directory from path, join to url for full download url.
+            """
+            file_name = Path(shortened_file_path).parts[-1]
+            return urljoin(self.nass_dataset_url, file_name)
+
+        soup = BeautifulSoup(self.resp_content, 'html.parser')
+        dataset_paths = []
+        blocks = soup.find_all('div', 'block')
+        for b in blocks:
+            links = b.find_all("a", "gz", href=True)
+            for l in links:
+                dataset_download_link = generate_full_download_links(l["href"])
+                dataset_paths.append(dataset_download_link)
+
+        self.dataset_links = dataset_paths
         
 
 class NassDatasetPageRetrievalError(Exception):
@@ -66,8 +94,7 @@ class NassDatasetPageRetrievalError(Exception):
 
 def main():
     n = NassDownload()
-    n.get_nass_datasets_page()
-    n.get_list_of_available_datasets()
+    n.display_nass_dataset_links()
 
 if __name__ == "__main__":
     main()
