@@ -3,6 +3,10 @@ import logging
 from pathlib import Path
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+import shutil
+import os
+
+from nass_io.downloader import download
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +14,12 @@ logger = logging.getLogger(__name__)
 class NassDownload:
     """
     Manages process of fetching dataset links and files from USDA NASS website.
+    Caveat : This class is a Band-Aid for retrieving the data and maintaining an on-premise or managed copy of the data. It's a hacky way of scraping dataset links for downloads that would work better if it was formalized into a managed ETL/database solution
+    TODO's:
+        - method I/O is coupled to scraping the dataset page's HTML; this isn't a huge deal currently but it'd lead to problems in the future if a package like this was supposed to be used in a pipeline.
     """
+    resp_content: requests.Response | None
+    dataset_links: list[str] | None
 
     def __init__(self):
         self.nass_dataset_url = "https://www.nass.usda.gov/datasets/"
@@ -28,10 +37,41 @@ class NassDownload:
         for i in self.dataset_links:
             print(i)
 
-    # def download_dataset(self, url: str):
+    def download_nass_dataset_file(self, urls: list[str]):
+        """
+        public method to download a USDA NASS file given the url. Checks whether the URL is "valid" (lazy, checks if it's in the links from the dataset page)
+        url, str : A download url from the USDA NASS data set page.
+        """
+        if self.dataset_links is None:
+            logging.debug("self.dataset_links was None; retrieving.")
+            self.get_nass_datasets_page()
+            self.get_list_of_available_dataset_urls()
+        for u in urls:
+            if self.dataset_links is not None and u not in self.dataset_links:
+                logging.debug("self.dataset_links specified; url passed was not in self.dataset_links. Output of self.dataset_links below\n%s", self.dataset_links)
+                raise ValueError("URL provided (`{}`) does not exist as a dataset on the USDA NASS datasets page.".format(u))
+        download(urls, dest_dir="./")
+    
+        # local_file_names = self._download_file(url)
+        # return local_file_name
+        
+    # def _download_file(self, url: str):
     #     """
-    #     Downloads a USDA NASS dataset from the provided URL, unzips it, places it in 
+    #     Internal helper that handles writing the file to disk.
+    #     For a given dataset url, attempt to download it to the local working directory.
+    #     - Since this will be placed in '/app' on the docker image, we don't pass a file path. An easy addition would be to enable passing a desired file path and downloading the file to that location.
+    #     - Taken from : https://stackoverflow.com/a/39217788
+    #     ---
+    #     url, str : download url passed from download_nass_dataset_file
+    #
+    #     returns the file path where the downloaded dataset (.txt.gz) file was placed
     #     """
+    #     local_file_name = url.split('/')[-1]
+    #     with requests.get(url, stream=True) as r:
+    #         with open(local_file_name, 'wb') as f:
+    #             shutil.copyfileobj(r.raw, f)
+    #
+    #     return local_file_name
 
     def get_nass_datasets_page(self, num_retries:int = 3):
         """
@@ -94,7 +134,8 @@ class NassDatasetPageRetrievalError(Exception):
 
 def main():
     n = NassDownload()
-    n.display_nass_dataset_links()
+    # NOTE : This is a sloppy hack to get around actually testing file download behavior.
+    n.download_nass_dataset_file(["https://www.nass.usda.gov/datasets/qs.census2002.txt.gz", "https://www.nass.usda.gov/datasets/qs.census2007.txt.gz"])
 
 if __name__ == "__main__":
     main()

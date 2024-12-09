@@ -10,5 +10,3 @@ COPY pyproject.toml poetry.lock /app/
 RUN poetry install --no-root
 
 ENTRYPOINT ["bash"]
-
-RUN echo "rat"
