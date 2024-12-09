@@ -16,3 +16,6 @@ Locally hosted tool that can be used to retrieve and analyze [USDA NASS data](ht
 ### `Dockerfile` behavior
 * The app's implemented such that the Dockerfile downloads the dataset from every time it's started. This is inefficient and could benefit from functionality that pulls `.txt.gz` or SQLite files from the users machine and uses those instead of downloading them.
     * TODO : Add ability to specify existing file argument to Docker on init to avoid users needing to download the file every time.
+
+## General TODO's
+* Add CI with GitHub Actions that will run pytest suite, build docker image
